@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shadow Remover — Clean product shots instantly</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; --bg2: #f7f7f5; --bg3: #f0efeb;
+    --text: #1a1a18; --text2: #6b6b67;
+    --border: rgba(0,0,0,0.1); --border2: rgba(0,0,0,0.18);
+    --radius: 12px; --radius-sm: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18; --bg2: #222220; --bg3: #2a2a28;
+      --text: #f0efeb; --text2: #8a8a85;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.2);
+    }
+  }
+  html, body { height: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+  header { padding: 1.25rem 2rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .logo { width: 28px; height: 28px; background: var(--text); border-radius: 7px; display: flex; align-items: center; justify-content: center; }
+  .logo svg { color: var(--bg); }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  header span { font-size: 13px; color: var(--text2); margin-left: 4px; }
+  main { flex: 1; padding: 2rem; max-width: 1100px; margin: 0 auto; width: 100%; }
+  #drop-zone { border: 1.5px dashed var(--border2); border-radius: var(--radius); padding: 4rem 2rem; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; background: var(--bg2); }
+  #drop-zone:hover, #drop-zone.drag-over { background: var(--bg3); border-color: var(--text2); }
+  #drop-zone input { display: none; }
+  #drop-zone .icon { margin-bottom: 16px; color: var(--text2); }
+  #drop-zone h2 { font-size: 18px; font-weight: 500; margin-bottom: 6px; }
+  #drop-zone p { font-size: 14px; color: var(--text2); }
+  #workspace { display: none; margin-top: 2rem; }
+  .controls-bar { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; padding: 1.25rem; background: var(--bg2); border-radius: var(--radius); border: 0.5px solid var(--border); margin-bottom: 1.5rem; }
+  .slider-group { flex: 1; min-width: 160px; }
+  .slider-group label { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+  .slider-group label span { font-weight: 600; color: var(--text); }
+  input[type=range] { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; background: var(--border2); outline: none; cursor: pointer; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--text); cursor: pointer; border: 2.5px solid var(--bg); box-shadow: 0 0 0 1px var(--border2); }
+  .btn { padding: 9px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.12s, transform 0.1s; border: 0.5px solid var(--border2); background: var(--bg); color: var(--text); white-space: nowrap; }
+  .btn:hover { background: var(--bg3); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: transparent; }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn-group { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+  .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 600px) { .preview-grid { grid-template-columns: 1fr; } main { padding: 1rem; } }
+  .preview-card { border-radius: var(--radius); border: 0.5px solid var(--border); overflow: hidden; }
+  .preview-label { padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text2); border-bottom: 0.5px solid var(--border); background: var(--bg2); display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #d1fae5; color: #065f46; font-weight: 500; }
+  .preview-image-area { background: repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 0 0 / 20px 20px; min-height: 280px; display: flex; align-items: center; justify-content: center; }
+  .preview-image-area img, .preview-image-area canvas { max-width: 100%; max-height: 400px; display: block; object-fit: contain; }
+  .placeholder-text { font-size: 13px; color: #999; padding: 2rem; text-align: center; }
+  #status-bar { margin-top: 1rem; font-size: 13px; color: var(--text2); min-height: 20px; }
+  footer { text-align: center; padding: 1.5rem; font-size: 12px; color: var(--text2); border-top: 0.5px solid var(--border); }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border2); border-top-color: var(--text); border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .new-file-btn { font-size: 12px; color: var(--text2); cursor: pointer; text-decoration: underline; background: none; border: none; padding: 0; }
+  .new-file-btn:hover { color: var(--text); }
+  .tip { font-size: 12px; color: var(--text2); background: var(--bg2); border: 0.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 1.5rem; line-height: 1.6; }
+  .tip strong { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    </svg>
+  </div>
+  <h1>Shadow Remover <span>— clean product shots instantly</span></h1>
+</header>
+
+<main>
+
+  <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept="image/*">
+    <div class="icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+    </div>
+    <h2>Drop your product image here</h2>
+    <p>PNG, JPG or WEBP — processed entirely in your browser, nothing uploaded</p>
+  </div>
+
+  <div id="workspace">
+    <div class="tip">
+      <strong>White threshold</strong> — how aggressively to flood-fill the background (raise if background edges remain, lower if white parts of the shoe disappear). &nbsp;·&nbsp;
+      <strong>Shadow removal</strong> — targets disconnected gray blobs below the shoe. &nbsp;·&nbsp;
+      <strong>Defringe</strong> — erodes the white/gray halo left by anti-aliasing at edges (raise if you see a white outline).
+    </div>
+    <div class="controls-bar">
+      <div class="slider-group">
+        <label>White threshold <span id="thresh-val">245</span></label>
+        <input type="range" id="threshold" min="200" max="254" value="245" step="1">
+      </div>
+      <div class="slider-group">
+        <label>Shadow removal <span id="sat-val">30%</span></label>
+        <input type="range" id="shadow-sat" min="0" max="60" value="30" step="1">
+      </div>
+      <div class="slider-group">
+        <label>Defringe <span id="defringe-val">2</span></label>
+        <input type="range" id="defringe" min="0" max="8" value="2" step="1">
+      </div>
+      <div class="btn-group">
+        <button class="btn primary" id="process-btn" onclick="processImage()">Remove BG + Shadow</button>
+        <button class="btn" id="download-btn" disabled onclick="downloadResult()">Download PNG</button>
+        <button class="new-file-btn" onclick="resetTool()">New image</button>
+      </div>
+    </div>
+
+    <div class="preview-grid">
+      <div class="preview-card">
+        <div class="preview-label">Original</div>
+        <div class="preview-image-area">
+          <img id="orig-preview" alt="Original">
+        </div>
+      </div>
+      <div class="preview-card">
+        <div class="preview-label">
+          Result
+          <span class="badge" id="result-badge" style="display:none">Done</span>
+        </div>
+        <div class="preview-image-area" id="result-area">
+          <p class="placeholder-text">Hit "Remove BG + Shadow" to process</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="status-bar"></div>
+  </div>
+
+</main>
+
+<footer>All processing happens locally in your browser — your images never leave your device.</footer>
+
+<script>
+let loadedImage = null;
+let resultBlob = null;
+
+const fileInput = document.getElementById('file-input');
+const dropZone = document.getElementById('drop-zone');
+const workspace = document.getElementById('workspace');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); });
+
+document.getElementById('threshold').addEventListener('input', function() { document.getElementById('thresh-val').textContent = this.value; });
+document.getElementById('shadow-sat').addEventListener('input', function() { document.getElementById('sat-val').textContent = this.value + '%'; });
+document.getElementById('defringe').addEventListener('input', function() { document.getElementById('defringe-val').textContent = this.value; });
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      loadedImage = img;
+      document.getElementById('orig-preview').src = e.target.result;
+      workspace.style.display = 'block';
+      dropZone.style.display = 'none';
+      document.getElementById('result-badge').style.display = 'none';
+      document.getElementById('download-btn').disabled = true;
+      document.getElementById('result-area').innerHTML = '<p class="placeholder-text">Hit "Remove BG + Shadow" to process</p>';
+      setStatus('Image loaded — ' + img.width + ' × ' + img.height + 'px');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setStatus(msg, loading) {
+  document.getElementById('status-bar').innerHTML = loading
+    ? '<span class="spinner"></span>' + msg : msg;
+}
+
+function resetTool() {
+  loadedImage = null; resultBlob = null; fileInput.value = '';
+  workspace.style.display = 'none';
+  dropZone.style.display = 'block';
+  document.getElementById('status-bar').textContent = '';
+}
+
+function processImage() {
+  if (!loadedImage) return;
+  const btn = document.getElementById('process-btn');
+  btn.disabled = true;
+  setStatus('Processing…', true);
+
+  const whiteThresh   = parseInt(document.getElementById('threshold').value);
+  const shadowSatPct  = parseInt(document.getElementById('shadow-sat').value) / 100;
+  const defringeIter  = parseInt(document.getElementById('defringe').value);
+
+  setTimeout(() => {
+    try {
+      const img = loadedImage;
+      const W = img.width, H = img.height, n = W * H;
+
+      const offscreen = document.createElement('canvas');
+      offscreen.width = W; offscreen.height = H;
+      const ctx = offscreen.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const src = ctx.getImageData(0, 0, W, H).data;
+
+      // ── Step 1: flood-fill white background from all 4 edges ──────────────
+      const isWhite = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        if (src[i*4] >= whiteThresh && src[i*4+1] >= whiteThresh && src[i*4+2] >= whiteThresh)
+          isWhite[i] = 1;
+      }
+
+      const bgMask = new Uint8Array(n);
+      const q = [];
+      const enq = idx => { if (!bgMask[idx] && isWhite[idx]) { bgMask[idx] = 1; q.push(idx); } };
+      for (let x = 0; x < W; x++) { enq(x); enq((H-1)*W + x); }
+      for (let y = 0; y < H; y++) { enq(y*W); enq(y*W + W - 1); }
+      for (let h = 0; h < q.length; h++) {
+        const idx = q[h], x = idx % W, y = (idx / W) | 0;
+        if (x > 0) enq(idx-1); if (x < W-1) enq(idx+1);
+        if (y > 0) enq(idx-W); if (y < H-1) enq(idx+W);
+      }
+
+      // ── Step 2: connected components of non-bg pixels ─────────────────────
+      const notBg = new Uint8Array(n);
+      for (let i = 0; i < n; i++) if (!bgMask[i]) notBg[i] = 1;
+
+      const label = new Int32Array(n).fill(-1);
+      const sizes = [];
+      for (let s = 0; s < n; s++) {
+        if (!notBg[s] || label[s] !== -1) continue;
+        const id = sizes.length;
+        const bfs = [s]; label[s] = id; let sz = 0, bh = 0;
+        while (bh < bfs.length) {
+          const idx = bfs[bh++]; sz++;
+          const x = idx % W, y = (idx / W) | 0;
+          const nb = [x>0?idx-1:-1, x<W-1?idx+1:-1, y>0?idx-W:-1, y<H-1?idx+W:-1];
+          for (const ni of nb) if (ni >= 0 && notBg[ni] && label[ni] === -1) { label[ni] = id; bfs.push(ni); }
+        }
+        sizes.push({ id, sz });
+      }
+      sizes.sort((a, b) => b.sz - a.sz);
+      const keepIds = new Set(sizes.slice(0, 2).filter(c => c.sz > 500).map(c => c.id));
+
+      // ── Step 3: optional shadow removal (low-sat disconnected blobs) ───────
+      const shadowMask = new Uint8Array(n);
+      if (shadowSatPct > 0) {
+        for (let i = 0; i < n; i++) {
+          if (bgMask[i] || keepIds.has(label[i])) continue;
+          const r = src[i*4], g = src[i*4+1], b = src[i*4+2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          const sat = mx > 0 ? (mx - mn) / mx : 0;
+          const lit = (mx + mn) / 2;
+          if (lit > 120 && sat < shadowSatPct) shadowMask[i] = 1;
+        }
+      }
+
+      // ── Step 4: build alpha mask ───────────────────────────────────────────
+      const alphaMask = new Uint8Array(n);
+      for (let i = 0; i < n; i++) {
+        if (!bgMask[i] && !shadowMask[i] && keepIds.has(label[i])) alphaMask[i] = 1;
+      }
+
+      // ── Step 5: defringe — iteratively kill light/gray edge pixels ─────────
+      // An "edge" pixel is kept but has at least one transparent (non-kept) neighbor
+      for (let iter = 0; iter < defringeIter; iter++) {
+        const toKill = new Uint8Array(n);
+        for (let i = 0; i < n; i++) {
+          if (!alphaMask[i]) continue;
+          const x = idx => idx % W, y = idx => (idx / W) | 0;
+          const xi = x(i), yi = y(i);
+          const hasTransNeighbor =
+            (xi > 0   && !alphaMask[i-1]) ||
+            (xi < W-1 && !alphaMask[i+1]) ||
+            (yi > 0   && !alphaMask[i-W]) ||
+            (yi < H-1 && !alphaMask[i+W]);
+          if (!hasTransNeighbor) continue;
+          // Check if this edge pixel is light / desaturated (fringe candidate)
+          const r = src[i*4], g = src[i*4+1], b = src[i*4+2];
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+          const sat = mx > 0 ? (mx - mn) / mx : 0;
+          const lit = (mx + mn) / 510; // 0-1
+          // Kill if bright AND low saturation (white/gray fringe)
+          if (lit > 0.72 && sat < 0.25) toKill[i] = 1;
+        }
+        for (let i = 0; i < n; i++) if (toKill[i]) alphaMask[i] = 0;
+      }
+
+      // ── Step 6: write output ───────────────────────────────────────────────
+      const outCanvas = document.createElement('canvas');
+      outCanvas.width = W; outCanvas.height = H;
+      const outCtx = outCanvas.getContext('2d');
+      const outData = outCtx.createImageData(W, H);
+      const od = outData.data;
+      for (let i = 0; i < n; i++) {
+        od[i*4]   = src[i*4];
+        od[i*4+1] = src[i*4+1];
+        od[i*4+2] = src[i*4+2];
+        od[i*4+3] = alphaMask[i] ? 255 : 0;
+      }
+      outCtx.putImageData(outData, 0, 0);
+
+      // Show result
+      const resultArea = document.getElementById('result-area');
+      resultArea.innerHTML = '';
+      resultArea.appendChild(outCanvas);
+
+      outCanvas.toBlob(blob => {
+        resultBlob = blob;
+        document.getElementById('download-btn').disabled = false;
+        document.getElementById('result-badge').style.display = 'inline-block';
+        setStatus('Done — ' + W + ' × ' + H + 'px · PNG with transparency ready to download.');
+      }, 'image/png');
+
+    } catch(e) {
+      setStatus('Error: ' + e.message);
+    }
+    btn.disabled = false;
+  }, 50);
+}
+
+function downloadResult() {
+  if (!resultBlob) return;
+  const url = URL.createObjectURL(resultBlob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'product-no-bg.png'; a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
